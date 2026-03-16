@@ -8,6 +8,7 @@ import {
   Library,
   PlusCircle,
   Tags,
+  FolderKanban,
   Menu,
   X,
   Folder,
@@ -15,23 +16,40 @@ import {
   Zap,
   ChevronsLeft,
   ChevronsRight,
+  Inbox,
+  Rss,
+  Search,
+  Command,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSpaces } from "@/hooks/useSpaces";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import useSWR from "swr";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inkorg", label: "Inkorg", icon: Inbox, hasBadge: true },
+  { href: "/flode", label: "Flöde", icon: Rss, hasBadge: true, badgeKey: "feed" as const },
   { href: "/minnen", label: "Minnen", icon: Library },
   { href: "/lagg-till", label: "Lägg till", icon: PlusCircle },
   { href: "/taggar", label: "Taggar", icon: Tags },
+  { href: "/projekt", label: "Projekt", icon: FolderKanban },
 ];
+
+const statsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { spaces, deleteSpace } = useSpaces();
   const { collapsed, toggle } = useSidebar();
+  const { resolved: currentTheme, toggle: toggleTheme } = useTheme();
+  const { data: statsData } = useSWR<{ data: { inbox_count: number; unread_feed_count?: number } }>("/api/statistics", statsFetcher, { refreshInterval: 30000 });
+  const inboxCount = statsData?.data?.inbox_count || 0;
+  const feedCount = statsData?.data?.unread_feed_count || 0;
 
   useEffect(() => {
     setMobileOpen(false);
@@ -82,6 +100,9 @@ export function Sidebar() {
         </p>
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const badgeCount = item.hasBadge
+            ? ("badgeKey" in item && item.badgeKey === "feed" ? feedCount : inboxCount)
+            : 0;
           return (
             <Link
               key={item.href}
@@ -99,7 +120,12 @@ export function Sidebar() {
                 strokeWidth={isActive ? 2 : 1.5}
               />
               <span className="relative">{item.label}</span>
-              {isActive && <div className="relative ml-auto w-1 h-4 rounded-full bg-amber-400/60" />}
+              {item.hasBadge && badgeCount > 0 && (
+                <span className="relative ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold tabular-nums px-1">
+                  {badgeCount}
+                </span>
+              )}
+              {isActive && (!item.hasBadge || badgeCount === 0) && <div className="relative ml-auto w-1 h-4 rounded-full bg-amber-400/60" />}
             </Link>
           );
         })}
@@ -126,7 +152,20 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="px-5 py-5">
+      <div className="px-5 py-5 space-y-3">
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-3 w-full rounded-xl px-4 py-2.5 text-[12px] font-medium text-sidebar-foreground/35 hover:text-sidebar-foreground/60 hover:bg-sidebar-muted transition-all duration-200"
+        >
+          {currentTheme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-400/70" strokeWidth={1.5} />
+          ) : (
+            <Moon className="h-4 w-4 text-sidebar-foreground/30" strokeWidth={1.5} />
+          )}
+          {currentTheme === "dark" ? "Ljust l\u00e4ge" : "M\u00f6rkt l\u00e4ge"}
+        </button>
+
         <div className="relative rounded-xl overflow-hidden px-4 py-3.5 border border-sidebar-foreground/[0.04]">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-amber-500/[0.02]" />
           <div className="relative flex items-center gap-2 mb-1">
@@ -172,6 +211,28 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className={cn("flex-1 py-1 space-y-0.5 transition-all duration-300", collapsed ? "px-2" : "px-4")}>
+        {/* Command palette trigger */}
+        {!collapsed ? (
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            className="flex items-center gap-2.5 w-full rounded-xl px-3 py-2 mb-3 text-[12px] font-medium text-sidebar-foreground/30 hover:text-sidebar-foreground/50 bg-sidebar-muted/50 hover:bg-sidebar-muted transition-all duration-200 border border-sidebar-foreground/[0.04]"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+            <span className="flex-1 text-left">Sök...</span>
+            <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sidebar-foreground/[0.06] text-sidebar-foreground/20 text-[10px] font-medium">
+              <Command className="h-2.5 w-2.5" />K
+            </kbd>
+          </button>
+        ) : (
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            className="flex items-center justify-center w-full rounded-xl py-2.5 mb-2 text-sidebar-foreground/25 hover:text-sidebar-foreground/50 hover:bg-sidebar-muted transition-all duration-200"
+            title="Sök (⌘K)"
+          >
+            <Search className="h-[17px] w-[17px]" strokeWidth={1.5} />
+          </button>
+        )}
+
         {!collapsed && (
           <p className="px-3 mb-2.5 text-[9px] font-bold text-sidebar-foreground/20 uppercase tracking-[0.15em]">
             Meny
@@ -179,6 +240,9 @@ export function Sidebar() {
         )}
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const badgeCount = item.hasBadge
+            ? ("badgeKey" in item && item.badgeKey === "feed" ? feedCount : inboxCount)
+            : 0;
           return (
             <Link
               key={item.href}
@@ -195,17 +259,29 @@ export function Sidebar() {
               )}
             >
               {isActive && <div className="absolute inset-0 rounded-xl bg-amber-500/8 blur-[4px]" />}
-              <item.icon
-                className={cn(
-                  "relative h-[17px] w-[17px] transition-colors shrink-0",
-                  isActive ? "text-amber-400" : "text-sidebar-foreground/25 group-hover:text-sidebar-foreground/50"
+              <div className="relative">
+                <item.icon
+                  className={cn(
+                    "h-[17px] w-[17px] transition-colors shrink-0",
+                    isActive ? "text-amber-400" : "text-sidebar-foreground/25 group-hover:text-sidebar-foreground/50"
+                  )}
+                  strokeWidth={isActive ? 2 : 1.5}
+                />
+                {collapsed && item.hasBadge && badgeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white px-0.5">
+                    {badgeCount > 9 ? "9+" : badgeCount}
+                  </span>
                 )}
-                strokeWidth={isActive ? 2 : 1.5}
-              />
+              </div>
               {!collapsed && (
                 <>
                   <span className="relative">{item.label}</span>
-                  {isActive && <div className="relative ml-auto w-1 h-4 rounded-full bg-amber-400/60" />}
+                  {item.hasBadge && badgeCount > 0 && (
+                    <span className="relative ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold tabular-nums px-1">
+                      {badgeCount}
+                    </span>
+                  )}
+                  {isActive && (!item.hasBadge || badgeCount === 0) && <div className="relative ml-auto w-1 h-4 rounded-full bg-amber-400/60" />}
                 </>
               )}
             </Link>
@@ -295,8 +371,29 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Collapse toggle button */}
-      <div className={cn("border-t border-sidebar-foreground/[0.04] transition-all duration-300", collapsed ? "px-2 py-3" : "px-5 py-3")}>
+      {/* Theme toggle + Collapse toggle */}
+      <div className={cn("border-t border-sidebar-foreground/[0.04] transition-all duration-300", collapsed ? "px-2 py-3 space-y-1" : "px-5 py-3 space-y-1")}>
+        <button
+          onClick={toggleTheme}
+          className={cn(
+            "flex items-center rounded-lg text-sidebar-foreground/25 hover:text-sidebar-foreground/50 hover:bg-sidebar-foreground/5 transition-all duration-200",
+            collapsed
+              ? "justify-center w-full py-2"
+              : "gap-2.5 px-3 py-2 w-full"
+          )}
+          title={currentTheme === "dark" ? "Ljust läge" : "Mörkt läge"}
+        >
+          {currentTheme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-400/70" strokeWidth={1.5} />
+          ) : (
+            <Moon className="h-4 w-4" strokeWidth={1.5} />
+          )}
+          {!collapsed && (
+            <span className="text-[11px] font-medium">
+              {currentTheme === "dark" ? "Ljust" : "Mörkt"}
+            </span>
+          )}
+        </button>
         <button
           onClick={toggle}
           className={cn(
@@ -340,6 +437,24 @@ export function Sidebar() {
             Mitt Minne
           </span>
         </div>
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-xl text-sidebar-foreground/40 hover:text-sidebar-foreground/80 hover:bg-sidebar-foreground/10 transition-colors"
+          title={currentTheme === "dark" ? "Ljust läge" : "Mörkt läge"}
+        >
+          {currentTheme === "dark" ? (
+            <Sun className="h-4.5 w-4.5 text-amber-400/70" />
+          ) : (
+            <Moon className="h-4.5 w-4.5" />
+          )}
+        </button>
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          className="p-2 rounded-xl text-sidebar-foreground/40 hover:text-sidebar-foreground/80 hover:bg-sidebar-foreground/10 transition-colors"
+          title="Sök"
+        >
+          <Search className="h-4.5 w-4.5" />
+        </button>
       </div>
 
       {/* Mobile overlay */}

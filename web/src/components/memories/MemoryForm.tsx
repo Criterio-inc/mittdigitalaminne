@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Image, Link2, FileText, Lightbulb, Youtube, Upload, X, Check, Loader2, Sparkles } from "lucide-react";
+import { Image, Link2, FileText, Lightbulb, Youtube, Headphones, Upload, X, Check, Loader2, Sparkles } from "lucide-react";
 import type { ContentType, Memory } from "@/lib/types";
 import { cn, contentTypeConfig } from "@/lib/utils";
 import { useTagSuggestions } from "@/hooks/useTagSuggestions";
@@ -16,6 +16,8 @@ const typeOptions: { type: ContentType; icon: any; desc: string }[] = [
   { type: "youtube", icon: Youtube, desc: "YouTube-video" },
   { type: "linkedin", icon: Link2, desc: "LinkedIn-inlägg" },
   { type: "instagram", icon: Image, desc: "Instagram-inlägg" },
+  { type: "twitter", icon: Link2, desc: "X/Twitter-inlägg" },
+  { type: "audio", icon: Headphones, desc: "Podcast eller ljud" },
 ];
 
 interface MemoryFormProps {
@@ -52,6 +54,7 @@ export function MemoryForm({ mode, memory, onSuccess }: MemoryFormProps) {
     content_type_hint?: string | null;
     video_id?: string;
     channel_name?: string;
+    snapshot_html?: string;
   } | null>(null);
   const lastUnfurledUrl = useRef("");
   const { suggestions, loading: suggestionsLoading, fetchSuggestions } = useTagSuggestions();
@@ -161,7 +164,7 @@ export function MemoryForm({ mode, memory, onSuccess }: MemoryFormProps) {
         tags,
       };
 
-      if (["link", "article", "youtube", "linkedin", "instagram"].includes(contentType)) {
+      if (["link", "article", "youtube", "linkedin", "instagram", "twitter", "audio"].includes(contentType)) {
         body.link_url = linkUrl.trim() || null;
 
         if (unfurlData && mode === "create") {
@@ -184,6 +187,12 @@ export function MemoryForm({ mode, memory, onSuccess }: MemoryFormProps) {
       }
 
       if (mode === "create") {
+        body.is_inbox = false;
+        // Store snapshot if available from unfurl
+        if (unfurlData?.snapshot_html) {
+          body.snapshot_html = unfurlData.snapshot_html;
+          body.snapshot_taken_at = new Date().toISOString();
+        }
         const res = await fetch("/api/memories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -300,7 +309,7 @@ export function MemoryForm({ mode, memory, onSuccess }: MemoryFormProps) {
       </div>
 
       {/* URL field */}
-      {["link", "article", "youtube", "linkedin", "instagram"].includes(contentType) && (
+      {["link", "article", "youtube", "linkedin", "instagram", "twitter", "audio"].includes(contentType) && (
         <div className="animate-fade-in">
           <label className="block text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.12em] mb-2">
             URL
